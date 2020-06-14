@@ -1,0 +1,14 @@
+
+table {
+    table-layout: fixed;
+}
+td{
+    overflow: hidden;
+}
+#filterslist {
+    display: flex;
+    flex-wrap: wrap;
+}
+.filterListItem{
+    margin: 5px;
+}

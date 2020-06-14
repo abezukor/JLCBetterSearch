@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="UTF-8"> 
+<head>
+	<title>JLC Search</title>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-csv/1.0.11/jquery.csv.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<h1>JLC Parts Search</h1>
+<p>The JLC parts library was last updated on June 13, 2020.</p>
+<body>
+	<form id="filtermaker" name="filtermaker">
+		<label for="attributesselect">Attribute:</label>
+		<select name="attributesselect" id="attributesselect">
+			<option value=0>LCSC Part</option>
+			<option value=1>MFR.Part</option>
+			<option value=2>First Category</option>
+			<option value=3>Second Category</option>
+			<option value=4>Package</option>
+			<option value=5>Solder Joint</option>
+			<option value=6>Manufacturer</option>
+			<option value=7>Library Type</option>
+			<option value=8>Description</option>
+			<option value=9>Datasheet</option>
+			<option value=10>Price</option>
+			<option value=11>Stock</option>
+		</select>
+		<label for="search_term">Search Term</label>
+		<input name = "search_term" type="text" id="search_term">
+		<button type='submit'>submit</button>
+	</form>
+	<div id="filtersList"></div>
+	<p onchange="partslistupdate();">There are <num id="resultscount"></num> Results. Showing <input type="number" id="numtoDisplay" min="1" max="1000" value="20"> 
+		Parts Per Page. On page <input type="number" id="pagenum" min="1" max="5" value="1"> of <num id="pagecount"></num>.</p>
+	<table style="width:100%" id="partsTable">
+		<tr>
+		  <th style="width: 5%;">LCSC Part</th>
+		  <th style="width: 10%;">MFR.Part</th>
+		  <th style="width: 5%;">First Category</th>
+		  <th style="width: 10%;">Second Category</th>
+		  <th style="width: 5%;">Package</th>
+		  <th style="width: 5%;"> Solder Joint</th>
+		  <th style="width: 10%;">Manufacturer</th>
+		  <th style="width: 5%;">Library Type</th>
+		  <th style="width: 20%;">Description</th>
+		  <th style="width: 15%;">Datasheet</th>
+		  <th style="width: 5%;">Price</th>
+		  <th style="width: 5%;">Stock</th>
+		</tr>
+	</table> 
+
+	<script>
+		var filters = [];
+		var filterID = 0;
+		var parts;
+
+		//Loads the parts
+		$(document).ready(function() {
+
+			$.ajax({
+					type: "GET",
+					url: "JLCparts.csv",
+					dataType: "text",
+					success: function(data) {processData(data);}
+				});
+		});
+		//makes an parts array
+		function processData(allText) {
+			//console.log(allText);
+			parts = $.csv.toArrays(allText);
+			parts.shift();
+			console.log(parts[12]);
+			partslistupdate();
+		}
+		//updates everything
+		function updateLists(){
+			partslistupdate();
+			filtersListUpdate();
+		}
+		//updates the parts list and the numbers
+		function partslistupdate(){
+			console.log("Rerender");
+			newpts = applyFilters(parts);
+			document.getElementById("resultscount").innerHTML = newpts.length;
+			var numperpage = Number(document.getElementById("numtoDisplay").value);
+			var pagenum = Number(document.getElementById("pagenum").value)-1;
+			document.getElementById("pagenum").setAttribute("max", Math.floor(newpts.length/numperpage)+1);
+			console.log(numperpage*pagenum+numperpage);
+			document.getElementById("pagecount").innerHTML = Math.floor(newpts.length/numperpage)+1;
+			renderTable(newpts,numperpage*pagenum, numperpage*pagenum+numperpage)
+		}
+		//updates the filters list
+		function filtersListUpdate(){
+			var list = document.getElementById("filtersList");
+			$('.filterListItem').remove();
+			filters.forEach(function (filter) {
+					var btn = document.createElement("button");
+					btn.innerHTML = "Remove: " + filter.displayText;
+					btn.setAttribute("onclick", "removeFilter("+ filter.id +")");
+					btn.className="filterListItem";
+
+					list.appendChild(btn);
+			});
+		}
+		//apply the filter to a big parts list
+		function applyFilters(parts){
+			function checkPart(part){
+				var passes = true;
+				filters.forEach(function (filter) {
+					passes = passes && filter.filter(part);
+				});
+				return passes;
+			}
+			var filteredparts = parts.filter(checkPart); 
+			return filteredparts
+		}
+		//render the parts table
+		function renderTable(displayparts,startnum=0,endnum=300){
+			console.log(startnum,endnum);
+			var partsTable = document.getElementById("partsTable");
+
+			$('.partdata').remove();
+
+			var i, j;
+			for(i=startnum; i<displayparts.length && i<endnum; i++){
+				var partRow = partsTable.insertRow(-1);
+				partRow.setAttribute("class", "partdata");
+				for(j=0; j<12;j++){
+					varField = partRow.insertCell(-1);
+					switch(j){
+						case 9:
+							varField.innerHTML = displayparts[i][j].link(displayparts[i][j]);
+							varField.children[0].setAttribute("target", "_blank"); 
+							varField.children[0].setAttribute("class", "partdata");
+							break;
+						default:
+							varField.innerHTML = "<p class =\"partdata\">" + displayparts[i][j] + "</p>";
+					}
+					
+				}
+			}
+		}
+
+		//Stuff for managing the filters list
+		$("#filtermaker").submit(function(e) {
+    		e.preventDefault();
+			makeFilter();
+		});
+		function makeFilter(){
+			var filterform = document.forms["filtermaker"];
+			console.log(filterform);
+			filters.push(new Filter(filterform["search_term"].value, filterform["attributesselect"].value, filterID));
+			filterID++;
+			updateLists();
+		}
+		function removeFilter(id) {
+			function checkFilter(filter){
+				return filter.id != id
+			}
+			filters = filters.filter(checkFilter);
+			updateLists();
+		}
+		class Filter{
+			constructor(text, col, id){
+				console.log(text,col);
+				this.col = col;
+				this.text = text
+				this.id = id;
+
+				var colTitles = {
+					0: "LCSC Part",
+					1: "MFR.Part",
+					2: "First Category",
+					3: "Second Category",
+					4: "Package",
+					5: "Solder Joint",
+					6: "Manufacturer",
+					7: "Library Type",
+					8: "Description",
+					9: "Datasheet",
+					10: "Price",
+					11: "Stock"
+				}
+				this.displayText = text + " in " + colTitles[col];
+			}
+			filter(part) {
+				return part[this.col].includes(this.text)
+			};
+		}
+	</script>
+</body>
+</html>
