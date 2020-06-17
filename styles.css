@@ -1,10 +1,14 @@
 
 table {
     table-layout: fixed;
+    border-collapse: collapse;
 }
 td{
     overflow: hidden;
 }
+table, th, td {
+    border: 1px dotted lightgrey;
+  }
 #filterslist {
     display: flex;
     flex-wrap: wrap;
